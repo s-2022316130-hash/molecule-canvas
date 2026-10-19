@@ -1,7 +1,7 @@
 import initRDKitModule from '@rdkit/rdkit'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { readCoordinates, toMolBlock } from './molfile.ts'
-import { addAtom, addBond, emptyMolecule, type BondOrder, type Molecule } from './molecule.ts'
+import { fromMolBlock, readCoordinates, toMolBlock } from './molfile.ts'
+import { addAtom, addBond, applyStereo, emptyMolecule, type BondOrder, type Molecule } from './molecule.ts'
 
 type RDKit = Awaited<ReturnType<typeof initRDKitModule>>
 let rdkit: RDKit
@@ -87,5 +87,29 @@ describe('readCoordinates', () => {
     const points = readCoordinates(rd.get_new_coords(true))
     rd.delete()
     expect(Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y)).toBeCloseTo(40, 0)
+  })
+})
+
+describe('fromMolBlock', () => {
+  it('reads back everything toMolBlock wrote (elements, bonds, charges, stereo, positions)', () => {
+    let mol = build([['C', 0, 0], ['N', 40, 0], ['O', 60, -34.64]], [[0, 1, 1], [1, 2, 2]])
+    mol = { ...mol, atoms: mol.atoms.map((a) => (a.element === 'N' ? { ...a, charge: 1 } : a)) }
+    mol = applyStereo(mol, mol.bonds[0].id, 'hash', mol.atoms[1].id)
+
+    const back = fromMolBlock(toMolBlock(mol))
+    expect(back.atoms.map((a) => [a.element, a.charge])).toEqual([['C', 0], ['N', 1], ['O', 0]])
+    expect(back.bonds.map((b) => b.order)).toEqual([1, 2])
+    expect(back.bonds[0].stereo).toBe('hash')
+    expect(back.atoms.find((a) => a.id === back.bonds[0].a1)!.element).toBe('N') // narrow end kept
+    expect(back.atoms[1].x - back.atoms[0].x).toBeCloseTo(40)
+  })
+
+  it("reads RDKit's MOL output, including charges and wedges", () => {
+    const rd = rdkit.get_mol('C[C@H](N)C(=O)[O-]')!
+    const mol = fromMolBlock(rd.get_molblock())
+    rd.delete()
+    expect(mol.atoms.filter((a) => a.charge === -1)).toHaveLength(1)
+    expect(mol.bonds.some((b) => b.stereo)).toBe(true)
+    expect(smilesOf(mol)).toBe('C[C@H](N)C(=O)[O-]')
   })
 })

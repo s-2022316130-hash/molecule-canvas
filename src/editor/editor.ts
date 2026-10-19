@@ -68,6 +68,8 @@ type Drag =
 export interface EditorOptions {
   /** Called with the molecule after every finished edit, undo or redo. */
   onChange?: (mol: Molecule) => void
+  /** The drawing to start with, e.g. restored from autosave. */
+  initial?: Molecule
   /** Returns the molecule with a tidy 2D layout, or null if that isn't possible yet. */
   cleanUp?: (mol: Molecule) => Molecule | null
 }
@@ -108,7 +110,7 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
   const hintEl = container.querySelector<HTMLSpanElement>('#tool-hint')!
   const countsEl = container.querySelector<HTMLSpanElement>('#counts')!
 
-  const history = new History<Molecule>(emptyMolecule)
+  const history = new History<Molecule>(options.initial ?? emptyMolecule)
   let tool: Tool = 'draw'
   let element = 'C'
   let ring: RingTemplate = RINGS[0]

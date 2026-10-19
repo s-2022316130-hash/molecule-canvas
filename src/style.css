@@ -387,3 +387,44 @@ h2 {
 .stereo-label.unknown {
   fill: var(--muted);
 }
+
+/* ---------- Phase 6: file bar ---------- */
+
+.file-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.file-bar button,
+.draw-in-editor {
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--canvas-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.file-bar button:hover,
+.draw-in-editor:hover {
+  border-color: var(--accent);
+}
+
+.draw-in-editor {
+  margin-top: 0.6rem;
+}
+
+.file-status {
+  margin-left: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.file-status.error {
+  color: var(--error);
+}

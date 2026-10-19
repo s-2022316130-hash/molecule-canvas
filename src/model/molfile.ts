@@ -5,7 +5,17 @@
 // table: one line per atom (x, y, z, element) and one line per bond.
 // Spec: "CTfile Formats" by BIOVIA/MDL.
 
-import type { Molecule } from './molecule.ts'
+import {
+  addAtom,
+  addBond,
+  applyStereo,
+  changeCharge,
+  emptyMolecule,
+  findBond,
+  type BondOrder,
+  type BondStereo,
+  type Molecule,
+} from './molecule.ts'
 
 const PIXELS_PER_BOND = 40 // our drawing's bond length (see BOND_LENGTH in editor/geometry.ts)
 const ANGSTROMS_PER_BOND = 1.5 // a typical C–C bond length; MOL coordinates are in ångströms
@@ -77,4 +87,53 @@ export function readCoordinates(molBlock: string): { x: number; y: number }[] {
   const average = lengths.length ? lengths.reduce((s, l) => s + l, 0) / lengths.length : ANGSTROMS_PER_BOND
   const scale = PIXELS_PER_BOND / (average || ANGSTROMS_PER_BOND)
   return raw.map((p) => ({ x: p.x * scale, y: p.y * scale }))
+}
+
+// Charge codes used in the atom lines of older MOL files (newer ones use "M  CHG").
+const ATOM_BLOCK_CHARGE: Record<number, number> = { 1: 3, 2: 2, 3: 1, 5: -1, 6: -2, 7: -3 }
+const STEREO_FROM_CODE: Record<number, BondStereo> = { 1: 'wedge', 6: 'hash' }
+
+/**
+ * Reads a V2000 MOL file into our model (the opposite of toMolBlock).
+ * Coordinates are rescaled to the drawing's bond length.
+ */
+export function fromMolBlock(molBlock: string): Molecule {
+  const lines = molBlock.split(/\r?\n/)
+  const atomCount = Number(lines[3].slice(0, 3))
+  const bondCount = Number(lines[3].slice(3, 6))
+  const points = readCoordinates(molBlock)
+
+  let mol: Molecule = emptyMolecule
+  const ids: number[] = []
+  lines.slice(4, 4 + atomCount).forEach((line, i) => {
+    const element = line.slice(31, 34).trim() || 'C'
+    const added = addAtom(mol, points[i].x, points[i].y, element)
+    const charge = ATOM_BLOCK_CHARGE[Number(line.slice(36, 39))] ?? 0
+    mol = charge ? changeCharge(added.mol, added.id, charge) : added.mol
+    ids.push(added.id)
+  })
+
+  for (const line of lines.slice(4 + atomCount, 4 + atomCount + bondCount)) {
+    const a1 = ids[Number(line.slice(0, 3)) - 1]
+    const a2 = ids[Number(line.slice(3, 6)) - 1]
+    const rawOrder = Number(line.slice(6, 9))
+    const order: BondOrder = rawOrder === 2 || rawOrder === 3 ? rawOrder : 1
+    mol = addBond(mol, a1, a2, order)
+    const stereo = STEREO_FROM_CODE[Number(line.slice(9, 12))]
+    if (stereo) mol = applyStereo(mol, findBond(mol, a1, a2)!.id, stereo, a1)
+  }
+
+  // "M  CHG" lines: count, then pairs of (atom number, charge). They replace atom-line charges.
+  for (const line of lines) {
+    if (!line.startsWith('M  CHG')) continue
+    const count = Number(line.slice(6, 9))
+    for (let k = 0; k < count; k++) {
+      const atomNumber = Number(line.slice(10 + k * 8, 13 + k * 8))
+      const charge = Number(line.slice(14 + k * 8, 17 + k * 8))
+      const id = ids[atomNumber - 1]
+      const current = mol.atoms.find((a) => a.id === id)?.charge ?? 0
+      mol = changeCharge(mol, id, charge - current)
+    }
+  }
+  return mol
 }

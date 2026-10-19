@@ -11,6 +11,8 @@ export interface Analysis {
   mw: number // average molecular weight, g/mol
   exactMass: number // monoisotopic mass
   smiles: string // canonical SMILES (includes @/@@ and / \ when stereo is defined)
+  inchi: string // IUPAC International Chemical Identifier ('' if RDKit couldn't make one)
+  inchiKey: string // 27-character hashed InChI, handy for searching databases
   atomStereo: Map<number, string> // atom id → "R", "S", or "?" for a stereocentre with no wedge yet
   bondStereo: Map<number, string> // bond id → "E" or "Z"
 }
@@ -33,6 +35,7 @@ export function analyze(rdkit: MainModule, mol: Molecule): Analysis | null {
 
     // RDKit numbers atoms in MOL-file order (0, 1, 2…), which is the order of mol.atoms.
     // It works out R/S from wedges and E/Z from the 2D geometry of double bonds (CIP rules).
+    const inchi = rd.get_inchi()
     const tags = JSON.parse(rd.get_stereo_tags()) as StereoTags
     const strip = (label: string) => label.replace(/[()]/g, '')
     const atomStereo = new Map(tags.CIP_atoms.map(([i, label]) => [mol.atoms[i].id, strip(label)]))
@@ -48,6 +51,8 @@ export function analyze(rdkit: MainModule, mol: Molecule): Analysis | null {
       mw: descriptors.amw,
       exactMass: descriptors.exactmw,
       smiles: rd.get_smiles(),
+      inchi,
+      inchiKey: inchi ? rdkit.get_inchikey_for_inchi(inchi) : '',
       atomStereo,
       bondStereo,
     }

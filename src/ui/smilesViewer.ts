@@ -15,13 +15,15 @@ const EXAMPLES: { name: string; smiles: string }[] = [
   { name: 'Sodium chloride', smiles: '[Na+].[Cl-]' },
 ]
 
-export async function mountSmilesViewer(container: HTMLElement): Promise<void> {
+/** `onDraw` receives the current SMILES when the user clicks "Draw in editor". */
+export async function mountSmilesViewer(container: HTMLElement, onDraw?: (smiles: string) => void): Promise<void> {
   // The skeleton is fixed text, so innerHTML is safe here.
   // Anything the user types is only ever inserted with textContent (never innerHTML).
   container.innerHTML = `
     <label for="smiles">SMILES</label>
     <input id="smiles" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. CCO" disabled />
     <div class="examples" id="examples"></div>
+    <button type="button" class="draw-in-editor" id="draw-in-editor" hidden>Draw in editor ↑</button>
     <p class="status" id="status">Loading chemistry engine…</p>
     <section class="result" id="result" hidden>
       <img id="structure" alt="2D structure" width="360" height="280" />
@@ -43,9 +45,12 @@ export async function mountSmilesViewer(container: HTMLElement): Promise<void> {
   const mwEl = container.querySelector<HTMLElement>('#mw')!
   const exactEl = container.querySelector<HTMLElement>('#exact')!
   const canonicalEl = container.querySelector<HTMLElement>('#canonical')!
+  const drawButton = container.querySelector<HTMLButtonElement>('#draw-in-editor')!
+  drawButton.addEventListener('click', () => onDraw?.(input.value.trim()))
 
   function showError(message: string) {
     result.hidden = true
+    drawButton.hidden = true
     status.textContent = message
     status.className = 'status error'
   }
@@ -57,6 +62,7 @@ export async function mountSmilesViewer(container: HTMLElement): Promise<void> {
     const smiles = input.value.trim()
     if (!smiles) {
       result.hidden = true
+      drawButton.hidden = true
       status.textContent = 'Type a SMILES string or pick an example.'
       status.className = 'status'
       return
@@ -81,6 +87,7 @@ export async function mountSmilesViewer(container: HTMLElement): Promise<void> {
       canonicalEl.textContent = mol.get_smiles()
 
       result.hidden = false
+      drawButton.hidden = !onDraw
       status.textContent = ''
       status.className = 'status'
     } finally {

@@ -26,6 +26,7 @@ export function mountPropertiesPanel(
       <div><dt>Molecular weight</dt><dd id="props-mw"></dd></div>
       <div><dt>Exact mass</dt><dd id="props-exact"></dd></div>
       <div><dt>SMILES</dt><dd id="props-smiles"></dd></div>
+      <div><dt>InChIKey</dt><dd id="props-inchikey"></dd></div>
     </dl>
   `
   const message = container.querySelector<HTMLParagraphElement>('#props-message')!
@@ -34,6 +35,7 @@ export function mountPropertiesPanel(
   const mwEl = container.querySelector<HTMLElement>('#props-mw')!
   const exactEl = container.querySelector<HTMLElement>('#props-exact')!
   const smilesEl = container.querySelector<HTMLElement>('#props-smiles')!
+  const inchiKeyEl = container.querySelector<HTMLElement>('#props-inchikey')!
 
   let rdkit: MainModule | null = null
   let latest: Molecule | null = null
@@ -66,6 +68,8 @@ export function mountPropertiesPanel(
     mwEl.textContent = `${result.mw.toFixed(2)} g/mol`
     exactEl.textContent = result.exactMass.toFixed(4)
     smilesEl.textContent = result.smiles
+    inchiKeyEl.textContent = result.inchiKey || '—'
+    inchiKeyEl.title = result.inchi // the full InChI appears on hover
     message.hidden = true
     props.hidden = false
     onAnalysis?.(result)

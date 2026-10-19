@@ -64,3 +64,12 @@ describe('analyze: stereochemistry', () => {
     expect(analyze(rdkit, cis.mol)!.bondStereo.get(findBond(cis.mol, cis.ids[1], cis.ids[2])!.id)).toBe('Z')
   })
 })
+
+describe('analyze: identifiers', () => {
+  it('gives the standard InChI and InChIKey of ethanol', () => {
+    const { mol } = build([['C', 0, 0], ['C', 40, 0], ['O', 60, -34.64]], [[0, 1, 1], [1, 2, 1]])
+    const result = analyze(rdkit, mol)!
+    expect(result.inchi).toBe('InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3')
+    expect(result.inchiKey).toBe('LFQSCWFLJHTTHZ-UHFFFAOYSA-N')
+  })
+})
