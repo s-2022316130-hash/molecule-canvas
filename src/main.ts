@@ -1,5 +1,6 @@
 import './style.css'
 import { mountEditor } from './editor/editor.ts'
+import { mountPropertiesPanel } from './ui/propertiesPanel.ts'
 import { mountSmilesViewer } from './ui/smilesViewer.ts'
 
 // Entry point: Vite loads this file from index.html.
@@ -15,6 +16,7 @@ app.innerHTML = `
     <section aria-labelledby="draw-heading">
       <h2 id="draw-heading">Draw</h2>
       <div id="editor"></div>
+      <div id="properties" class="properties" aria-live="polite"></div>
     </section>
     <section aria-labelledby="smiles-heading">
       <h2 id="smiles-heading">SMILES viewer</h2>
@@ -24,6 +26,7 @@ app.innerHTML = `
 `
 
 // The editor needs no chemistry engine, so it appears straight away;
-// the viewer waits for RDKit's WebAssembly to download.
-mountEditor(document.querySelector<HTMLDivElement>('#editor')!)
+// the properties panel and viewer fill in once RDKit's WebAssembly has downloaded.
+const updateProperties = mountPropertiesPanel(document.querySelector<HTMLDivElement>('#properties')!)
+mountEditor(document.querySelector<HTMLDivElement>('#editor')!, updateProperties)
 await mountSmilesViewer(document.querySelector<HTMLDivElement>('#smiles-viewer')!)

@@ -14,6 +14,7 @@ import {
   type Molecule,
 } from '../model/molecule.ts'
 import { angleBetween, newBondAngle, pointAt, snapAngle, type Point } from './geometry.ts'
+import { valenceProblems } from '../model/valence.ts'
 import { atomAt, bondAt } from './hitTest.ts'
 import { History } from './history.ts'
 import { render, type Highlight } from './renderer.ts'
@@ -34,7 +35,8 @@ type Drag =
   | { kind: 'bond-from-empty'; start: Point; moved: boolean }
   | { kind: 'move-atom'; atomId: number; start: Point; moved: boolean }
 
-export function mountEditor(container: HTMLElement): void {
+/** `onChange` is called with the molecule after every finished edit, undo or redo. */
+export function mountEditor(container: HTMLElement, onChange?: (mol: Molecule) => void): void {
   container.innerHTML = `
     <div class="toolbar" role="toolbar" aria-label="Drawing tools">
       <div class="tool-group" id="tools"></div>
@@ -61,6 +63,7 @@ export function mountEditor(container: HTMLElement): void {
   let draft: Molecule | null = null // a molecule being changed live during a drag (not in history yet)
   let highlight: Highlight = {}
   let preview: [Point, Point] | undefined
+  let lastReported: Molecule | null = null
 
   const toolButtons = TOOLS.map((t) => {
     const button = document.createElement('button')
@@ -81,7 +84,14 @@ export function mountEditor(container: HTMLElement): void {
 
   function redraw() {
     const mol = draft ?? history.current
-    render(svg, mol, highlight, preview)
+    const problems = new Set(valenceProblems(mol).map((p) => p.atomId))
+    render(svg, mol, highlight, preview, problems)
+
+    // Tell the outside world about finished changes only (not every frame of a drag).
+    if (history.current !== lastReported) {
+      lastReported = history.current
+      onChange?.(history.current)
+    }
     undoBtn.disabled = !history.canUndo
     redoBtn.disabled = !history.canRedo
     const atoms = mol.atoms.length

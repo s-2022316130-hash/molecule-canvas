@@ -53,8 +53,8 @@ function drawBond(mol: Molecule, bond: Bond, highlighted: boolean): SVGGElement 
   return group
 }
 
-function drawAtom(mol: Molecule, atom: Atom, highlighted: boolean): SVGGElement {
-  const group = el('g', { class: highlighted ? 'atom highlighted' : 'atom' })
+function drawAtom(mol: Molecule, atom: Atom, highlighted: boolean, problem: boolean): SVGGElement {
+  const group = el('g', { class: ['atom', highlighted && 'highlighted', problem && 'problem'].filter(Boolean).join(' ') })
   // A soft circle shows which atom the mouse is over (styled in CSS).
   group.append(el('circle', { cx: atom.x, cy: atom.y, r: 9, class: 'atom-halo' }))
 
@@ -72,13 +72,22 @@ function drawAtom(mol: Molecule, atom: Atom, highlighted: boolean): SVGGElement 
   return group
 }
 
-/** Redraws the whole molecule. Simple, and fast enough for hand-drawn molecules. */
-export function render(svg: SVGSVGElement, mol: Molecule, highlight: Highlight = {}, preview?: [Point, Point]) {
+/**
+ * Redraws the whole molecule. Simple, and fast enough for hand-drawn molecules.
+ * `problems` holds ids of atoms to mark in red (e.g. too many bonds).
+ */
+export function render(
+  svg: SVGSVGElement,
+  mol: Molecule,
+  highlight: Highlight = {},
+  preview?: [Point, Point],
+  problems: ReadonlySet<number> = new Set(),
+) {
   const bonds = el('g', { class: 'bonds' })
   for (const bond of mol.bonds) bonds.append(drawBond(mol, bond, bond.id === highlight.bondId))
 
   const atoms = el('g', { class: 'atoms' })
-  for (const atom of mol.atoms) atoms.append(drawAtom(mol, atom, atom.id === highlight.atomId))
+  for (const atom of mol.atoms) atoms.append(drawAtom(mol, atom, atom.id === highlight.atomId, problems.has(atom.id)))
 
   const overlay = el('g', { class: 'overlay' })
   if (preview) overlay.append(line(preview[0], preview[1], 'preview-line'))
