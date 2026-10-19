@@ -4,6 +4,8 @@
   --muted: #5b6475;
   --accent: #1f7a5a;
   --code-bg: #eef1f5;
+  --border: #d5dae3;
+  --error: #b3261e;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
@@ -18,6 +20,8 @@
     --muted: #9aa3b2;
     --accent: #4cc39a;
     --code-bg: #232833;
+    --border: #353c4a;
+    --error: #f2938c;
   }
 }
 
@@ -51,4 +55,83 @@ code {
   background: var(--code-bg);
   padding: 0.1em 0.35em;
   border-radius: 4px;
+}
+
+label {
+  display: block;
+  margin-top: 1.5rem;
+  font-weight: 600;
+}
+
+input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  font: 1rem ui-monospace, Consolas, monospace;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.examples button {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.examples button:hover {
+  border-color: var(--accent);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+.result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.result img {
+  max-width: 100%;
+  height: auto;
+  background: #ffffff; /* RDKit draws dark bonds, so keep a white card in dark mode too */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+dl {
+  margin: 0;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+dd {
+  margin: 0 0 0.9rem;
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
 }
