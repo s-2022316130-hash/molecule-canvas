@@ -6,6 +6,8 @@
   --code-bg: #eef1f5;
   --border: #d5dae3;
   --error: #b3261e;
+  --canvas-bg: #ffffff;
+  --bond: #1d2330;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
@@ -22,6 +24,8 @@
     --code-bg: #232833;
     --border: #353c4a;
     --error: #f2938c;
+    --canvas-bg: #1b1f27;
+    --bond: #e6e9ef;
   }
 }
 
@@ -135,3 +139,127 @@ dd {
   font-size: 1.125rem;
   overflow-wrap: anywhere;
 }
+
+/* ---------- Phase 2: drawing editor ---------- */
+
+h2 {
+  margin: 2rem 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tool-group {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.toolbar button {
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.toolbar button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.toolbar button[aria-pressed='true'] {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--canvas-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  touch-action: none; /* let the editor handle touch/pen drags instead of the page scrolling */
+  user-select: none;
+}
+
+.canvas[data-tool='draw'] {
+  cursor: crosshair;
+}
+
+.canvas[data-tool='move'] {
+  cursor: move;
+}
+
+.canvas[data-tool='erase'] {
+  cursor: not-allowed;
+}
+
+.canvas-status {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.bond-line {
+  stroke: var(--bond);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.bond.highlighted .bond-line {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+.preview-line {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+}
+
+.atom-halo {
+  fill: transparent;
+}
+
+.atom.highlighted .atom-halo {
+  fill: var(--accent);
+  fill-opacity: 0.25;
+}
+
+.atom-label {
+  font: 600 15px system-ui, sans-serif;
+  fill: var(--bond);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.atom-charge {
+  font: 600 10px system-ui, sans-serif;
+  fill: var(--bond);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+/* Conventional CPK-style colours for common elements */
+.element-N { fill: #2f5fd0; }
+.element-O { fill: #d0312d; }
+.element-S { fill: #b8860b; }
+.element-F,
+.element-Cl { fill: #1e9e4a; }
+.element-Br { fill: #a23b1b; }
+.element-I { fill: #7b2fa0; }
