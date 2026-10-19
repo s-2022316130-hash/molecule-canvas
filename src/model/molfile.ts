@@ -51,3 +51,27 @@ export function toMolBlock(mol: Molecule, title = ''): string {
   lines.push('M  END')
   return lines.join('\n')
 }
+
+/**
+ * Reads the atom positions out of a V2000 MOL file, converted to our canvas pixels.
+ * Coordinates are rescaled so the average bond is one drawing bond long,
+ * because different layout methods use different bond lengths.
+ */
+export function readCoordinates(molBlock: string): { x: number; y: number }[] {
+  const lines = molBlock.split(/\r?\n/)
+  const atomCount = Number(lines[3].slice(0, 3))
+  const bondCount = Number(lines[3].slice(3, 6))
+  const raw = lines.slice(4, 4 + atomCount).map((line) => ({
+    x: Number(line.slice(0, 10)),
+    y: -Number(line.slice(10, 20)), // flip back: screen y grows downwards
+  }))
+
+  const lengths = lines.slice(4 + atomCount, 4 + atomCount + bondCount).map((line) => {
+    const a = raw[Number(line.slice(0, 3)) - 1]
+    const b = raw[Number(line.slice(3, 6)) - 1]
+    return Math.hypot(a.x - b.x, a.y - b.y)
+  })
+  const average = lengths.length ? lengths.reduce((s, l) => s + l, 0) / lengths.length : ANGSTROMS_PER_BOND
+  const scale = PIXELS_PER_BOND / (average || ANGSTROMS_PER_BOND)
+  return raw.map((p) => ({ x: p.x * scale, y: p.y * scale }))
+}

@@ -37,6 +37,26 @@ export function maxValence(element: string, charge = 0): number | undefined {
   return valences ? Math.max(...valences) : undefined
 }
 
+/** Total bond order around an atom (a double bond counts 2). */
+export function bondOrderSum(mol: Molecule, atomId: number): number {
+  return mol.bonds.reduce((sum, b) => sum + (b.a1 === atomId || b.a2 === atomId ? b.order : 0), 0)
+}
+
+/**
+ * Hydrogens an atom carries without them being drawn, e.g. 1 for the O in ethanol.
+ * Uses the smallest allowed valence that fits the bonds already there.
+ */
+export function implicitHydrogens(mol: Molecule, atomId: number): number {
+  const atom = mol.atoms.find((a) => a.id === atomId)
+  if (!atom) return 0
+  const z = ATOMIC_NUMBER[atom.element]
+  const valences = z === undefined ? undefined : VALENCES[SYMBOL_OF[z - atom.charge] ?? '']
+  if (!valences) return 0
+  const used = bondOrderSum(mol, atomId)
+  const fits = valences.find((v) => v >= used)
+  return fits === undefined ? 0 : fits - used
+}
+
 export interface ValenceProblem {
   atomId: number
   element: string

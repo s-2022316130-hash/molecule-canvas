@@ -2,11 +2,13 @@
 // It only READS the model; all changes go through the model functions.
 
 import { getAtom, neighbors, type Atom, type Bond, type Molecule } from '../model/molecule.ts'
+import { implicitHydrogens } from '../model/valence.ts'
 import type { Point } from './geometry.ts'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const LABEL_GAP = 9 // how far a bond stops short of a written atom label like "O"
 const MULTI_BOND_OFFSET = 3.5 // spacing between the lines of a double/triple bond
+const HYDROGEN_FIRST = new Set(['O', 'S', 'F', 'Cl', 'Br', 'I'])
 
 export interface Highlight {
   atomId?: number
@@ -62,9 +64,35 @@ function drawAtom(mol: Molecule, atom: Atom, highlighted: boolean, problem: bool
     const label = el('text', { x: atom.x, y: atom.y, class: `atom-label element-${atom.element}` })
     label.textContent = atom.element
     group.append(label)
+
+    // Write the hydrogens next to the element (OH, NH2), on the side away from the bonds.
+    const halfWidth = atom.element.length === 1 ? 5.5 : 8
+    const hydrogens = implicitHydrogens(mol, atom.id)
+    const atomNeighbors = neighbors(mol, atom.id)
+    const bondsToRight = atomNeighbors.reduce((sum, n) => sum + Math.sign(n.x - atom.x), 0) > 0
+    // Lone molecules follow convention: H2O, H2S, HCl (H first) but NH3, CH4 (H last).
+    const hydrogenFirst = atomNeighbors.length === 0 && HYDROGEN_FIRST.has(atom.element)
+    let rightEdge = atom.x + halfWidth
+    if (hydrogens > 0) {
+      const onLeft = bondsToRight || hydrogenFirst
+      const h = el('text', {
+        x: onLeft ? atom.x - halfWidth : atom.x + halfWidth,
+        y: atom.y,
+        class: `atom-label atom-h ${onLeft ? 'h-left' : 'h-right'} element-${atom.element}`,
+      })
+      h.append('H')
+      if (hydrogens > 1) {
+        const count = el('tspan', { dy: 4, class: 'h-count' })
+        count.textContent = String(hydrogens)
+        h.append(count)
+      }
+      group.append(h)
+      if (!onLeft) rightEdge += hydrogens > 1 ? 17 : 11
+    }
+
     if (atom.charge !== 0) {
       const size = Math.abs(atom.charge)
-      const charge = el('text', { x: atom.x + 9, y: atom.y - 8, class: 'atom-charge' })
+      const charge = el('text', { x: rightEdge + 3, y: atom.y - 8, class: 'atom-charge' })
       charge.textContent = (size === 1 ? '' : String(size)) + (atom.charge > 0 ? '+' : '−')
       group.append(charge)
     }

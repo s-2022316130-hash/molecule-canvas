@@ -1,4 +1,7 @@
 import './style.css'
+import type { MainModule } from '@rdkit/rdkit'
+import { cleanUpLayout } from './chem/layout.ts'
+import { loadRDKit } from './chem/rdkit.ts'
 import { mountEditor } from './editor/editor.ts'
 import { mountPropertiesPanel } from './ui/propertiesPanel.ts'
 import { mountSmilesViewer } from './ui/smilesViewer.ts'
@@ -27,6 +30,12 @@ app.innerHTML = `
 
 // The editor needs no chemistry engine, so it appears straight away;
 // the properties panel and viewer fill in once RDKit's WebAssembly has downloaded.
+let rdkit: MainModule | null = null
+loadRDKit().then((module) => (rdkit = module))
+
 const updateProperties = mountPropertiesPanel(document.querySelector<HTMLDivElement>('#properties')!)
-mountEditor(document.querySelector<HTMLDivElement>('#editor')!, updateProperties)
+mountEditor(document.querySelector<HTMLDivElement>('#editor')!, {
+  onChange: updateProperties,
+  cleanUp: (mol) => (rdkit ? cleanUpLayout(rdkit, mol) : null),
+})
 await mountSmilesViewer(document.querySelector<HTMLDivElement>('#smiles-viewer')!)

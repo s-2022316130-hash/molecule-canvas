@@ -1,6 +1,6 @@
 import initRDKitModule from '@rdkit/rdkit'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { toMolBlock } from './molfile.ts'
+import { readCoordinates, toMolBlock } from './molfile.ts'
 import { addAtom, addBond, emptyMolecule, type BondOrder, type Molecule } from './molecule.ts'
 
 type RDKit = Awaited<ReturnType<typeof initRDKitModule>>
@@ -71,5 +71,21 @@ describe('toMolBlock', () => {
     mol = { ...mol, atoms: mol.atoms.map((a) => ({ ...a, charge: 1 })) }
     expect(toMolBlock(mol)).toContain('M  CHG  1   1   1')
     expect(smilesOf(mol)).toBe('[NH4+]')
+  })
+})
+
+describe('readCoordinates', () => {
+  it('reads back what toMolBlock wrote', () => {
+    const mol = build([['C', 0, 0], ['C', 40, 0], ['O', 60, -34.64]], [[0, 1, 1], [1, 2, 1]])
+    const points = readCoordinates(toMolBlock(mol))
+    expect(points[1].x - points[0].x).toBeCloseTo(40)
+    expect(points[2].y - points[1].y).toBeCloseTo(-34.64, 1)
+  })
+
+  it('rescales a layout with shorter bonds to the drawing bond length', () => {
+    const rd = rdkit.get_mol('CCO')!
+    const points = readCoordinates(rd.get_new_coords(true))
+    rd.delete()
+    expect(Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y)).toBeCloseTo(40, 0)
   })
 })

@@ -302,3 +302,58 @@ h2 {
   margin: 0;
   font-size: 1.05rem;
 }
+
+/* ---------- Phase 4: palettes, hydrogens ---------- */
+
+.atom-label.h-right {
+  text-anchor: start;
+}
+
+.atom-label.h-left {
+  text-anchor: end;
+}
+
+.h-count {
+  font-size: 11px;
+}
+
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.palette-label {
+  margin-right: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.palette button {
+  min-width: 2.2rem;
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--canvas-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.palette button:hover {
+  border-color: var(--accent);
+}
+
+.palette button[aria-pressed='true'] {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.palette-spacer {
+  width: 0.75rem;
+}

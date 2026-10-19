@@ -94,3 +94,72 @@ export function removeBond(mol: Molecule, bondId: number): Molecule {
 export function moveAtom(mol: Molecule, atomId: number, x: number, y: number): Molecule {
   return { ...mol, atoms: mol.atoms.map((a) => (a.id === atomId ? { ...a, x, y } : a)) }
 }
+
+/** Moves many atoms at once, e.g. after "Clean up". Atoms not in the map stay put. */
+export function setPositions(mol: Molecule, positions: ReadonlyMap<number, { x: number; y: number }>): Molecule {
+  return {
+    ...mol,
+    atoms: mol.atoms.map((a) => {
+      const p = positions.get(a.id)
+      return p ? { ...a, x: p.x, y: p.y } : a
+    }),
+  }
+}
+
+export function setElement(mol: Molecule, atomId: number, element: string): Molecule {
+  const atom = getAtom(mol, atomId)
+  if (!atom || atom.element === element) return mol
+  return { ...mol, atoms: mol.atoms.map((a) => (a.id === atomId ? { ...a, element } : a)) }
+}
+
+/** Adds `delta` to an atom's charge, kept between −3 and +3. */
+export function changeCharge(mol: Molecule, atomId: number, delta: number): Molecule {
+  const atom = getAtom(mol, atomId)
+  if (!atom) return mol
+  const charge = Math.max(-3, Math.min(3, atom.charge + delta))
+  if (charge === atom.charge) return mol
+  return { ...mol, atoms: mol.atoms.map((a) => (a.id === atomId ? { ...a, charge } : a)) }
+}
+
+export function setBondOrder(mol: Molecule, bondId: number, order: BondOrder): Molecule {
+  return { ...mol, bonds: mol.bonds.map((b) => (b.id === bondId ? { ...b, order } : b)) }
+}
+
+/** Splits the molecule into connected pieces (fragments), each a list of atom ids. */
+export function fragments(mol: Molecule): number[][] {
+  const seen = new Set<number>()
+  const result: number[][] = []
+  for (const start of mol.atoms) {
+    if (seen.has(start.id)) continue
+    const piece: number[] = []
+    const stack = [start.id]
+    seen.add(start.id)
+    while (stack.length) {
+      const id = stack.pop()!
+      piece.push(id)
+      for (const n of neighbors(mol, id)) {
+        if (!seen.has(n.id)) {
+          seen.add(n.id)
+          stack.push(n.id)
+        }
+      }
+    }
+    result.push(piece)
+  }
+  return result
+}
+
+/** The part of the molecule made of the given atoms and the bonds between them. */
+export function subMolecule(mol: Molecule, atomIds: readonly number[]): Molecule {
+  const keep = new Set(atomIds)
+  return {
+    atoms: mol.atoms.filter((a) => keep.has(a.id)),
+    bonds: mol.bonds.filter((b) => keep.has(b.a1) && keep.has(b.a2)),
+    nextId: mol.nextId,
+  }
+}
+
+/** True if the atom already has a double or triple bond. */
+export function hasMultipleBond(mol: Molecule, atomId: number): boolean {
+  return mol.bonds.some((b) => (b.a1 === atomId || b.a2 === atomId) && b.order > 1)
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { addAtom, addBond, cycleBondOrder, emptyMolecule } from './molecule.ts'
-import { maxValence, valenceProblems } from './valence.ts'
+import { implicitHydrogens, maxValence, valenceProblems } from './valence.ts'
 
 describe('maxValence', () => {
   it('knows the common neutral valences', () => {
@@ -49,5 +49,35 @@ describe('valenceProblems', () => {
     expect(valenceProblems(mol)).toEqual([])
     mol = cycleBondOrder(mol, mol.bonds[1].id) // two double + one single = 5: too many
     expect(valenceProblems(mol)).toMatchObject([{ atomId: centreId, bonds: 5 }])
+  })
+})
+
+describe('implicitHydrogens', () => {
+  function single(element: string, charge = 0) {
+    const added = addAtom(emptyMolecule, 0, 0, element)
+    const mol = { ...added.mol, atoms: added.mol.atoms.map((a) => ({ ...a, charge })) }
+    return { mol, id: added.id }
+  }
+
+  it('fills a lone atom up to its normal valence', () => {
+    const c = single('C')
+    expect(implicitHydrogens(c.mol, c.id)).toBe(4) // CH4
+    const o = single('O')
+    expect(implicitHydrogens(o.mol, o.id)).toBe(2) // H2O
+  })
+
+  it('accounts for charge', () => {
+    const n = single('N', +1)
+    expect(implicitHydrogens(n.mol, n.id)).toBe(4) // NH4+
+    const o = single('O', -1)
+    expect(implicitHydrogens(o.mol, o.id)).toBe(1) // OH-
+  })
+
+  it('counts the bonds already present (ethanol oxygen has one H)', () => {
+    const c = addAtom(emptyMolecule, 0, 0)
+    const o = addAtom(c.mol, 40, 0, 'O')
+    const mol = addBond(o.mol, c.id, o.id)
+    expect(implicitHydrogens(mol, o.id)).toBe(1)
+    expect(implicitHydrogens(mol, c.id)).toBe(3)
   })
 })
