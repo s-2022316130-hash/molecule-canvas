@@ -64,6 +64,18 @@ type Drag =
   | { kind: 'bond-from-atom'; atomId: number; start: Point; moved: boolean }
   | { kind: 'bond-from-empty'; start: Point; moved: boolean }
   | { kind: 'move-atom'; atomId: number; start: Point; moved: boolean }
+  | { kind: 'pan'; clientX: number; clientY: number; viewStart: ViewBox }
+
+// The part of the drawing the canvas shows. Zooming makes it smaller; panning moves it.
+interface ViewBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+const HOME_VIEW: ViewBox = { x: 0, y: 0, w: 720, h: 420 }
+const MIN_VIEW_WIDTH = 180 // 400% zoom
+const MAX_VIEW_WIDTH = 2880 // 25% zoom
 
 export interface EditorOptions {
   /** Called with the molecule after every finished edit, undo or redo. */
@@ -93,11 +105,29 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
         <button type="button" id="cleanup" title="Tidy the layout (RDKit 2D coordinates)">Clean up</button>
         <button type="button" id="clear" title="Clear the canvas (can be undone)">Clear</button>
       </div>
+      <div class="tool-group" aria-label="Zoom">
+        <button type="button" id="zoom-out" title="Zoom out (Ctrl + mouse wheel)">−</button>
+        <span class="zoom-level" id="zoom-level">100%</span>
+        <button type="button" id="zoom-in" title="Zoom in (Ctrl + mouse wheel)">+</button>
+        <button type="button" id="zoom-fit" title="Fit the drawing to the canvas">Fit</button>
+      </div>
     </div>
     <div class="palette" id="elements" role="toolbar" aria-label="Elements"><span class="palette-label">Element</span></div>
     <div class="palette" id="rings" role="toolbar" aria-label="Rings"><span class="palette-label">Ring</span></div>
     <svg class="canvas" viewBox="0 0 720 420" role="img" aria-label="Drawing canvas"></svg>
     <p class="canvas-status"><span id="tool-hint"></span> <span id="counts"></span></p>
+    <details class="shortcuts">
+      <summary>Keyboard and mouse shortcuts</summary>
+      <dl>
+        <dt>C N O S P F H I, L (Cl), B (Br)</dt><dd>Hover an atom and press the letter to change its element</dd>
+        <dt>+ / −</dt><dd>Hover an atom to add a positive / negative charge</dd>
+        <dt>Delete or Backspace</dt><dd>Delete the hovered atom or bond</dd>
+        <dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo / redo (Ctrl+Shift+Z also redoes)</dd>
+        <dt>Ctrl + mouse wheel</dt><dd>Zoom in and out around the mouse</dd>
+        <dt>Space + drag, or middle-button drag</dt><dd>Pan the canvas</dd>
+        <dt>Esc</dt><dd>Cancel a drag in progress</dd>
+      </dl>
+    </details>
   `
   const svg = container.querySelector<SVGSVGElement>('svg')!
   const toolsEl = container.querySelector<HTMLDivElement>('#tools')!
@@ -109,6 +139,66 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
   const clearBtn = container.querySelector<HTMLButtonElement>('#clear')!
   const hintEl = container.querySelector<HTMLSpanElement>('#tool-hint')!
   const countsEl = container.querySelector<HTMLSpanElement>('#counts')!
+  const zoomLevel = container.querySelector<HTMLSpanElement>('#zoom-level')!
+
+  // ---- Zoom and pan: change which part of the drawing the SVG shows (its viewBox). ----
+  let view: ViewBox = { ...HOME_VIEW }
+  let spaceHeld = false
+  let pointerOverCanvas = false
+  svg.addEventListener('pointerenter', () => (pointerOverCanvas = true))
+  svg.addEventListener('pointerleave', () => (pointerOverCanvas = false))
+
+  function applyView() {
+    svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`)
+    zoomLevel.textContent = `${Math.round((HOME_VIEW.w / view.w) * 100)}%`
+  }
+
+  /** Zooms by `factor` (2 = twice as big), keeping the point `centre` fixed on screen. */
+  function zoomAt(factor: number, centre: Point) {
+    const w = Math.max(MIN_VIEW_WIDTH, Math.min(MAX_VIEW_WIDTH, view.w / factor))
+    const k = w / view.w
+    view = { x: centre.x - (centre.x - view.x) * k, y: centre.y - (centre.y - view.y) * k, w, h: view.h * k }
+    applyView()
+  }
+
+  const viewCentre = (): Point => ({ x: view.x + view.w / 2, y: view.y + view.h / 2 })
+
+  /** Frames the whole drawing (or resets to 100% when the canvas is empty). */
+  function fitView() {
+    const atoms = history.current.atoms
+    if (atoms.length === 0) {
+      view = { ...HOME_VIEW }
+      return applyView()
+    }
+    const margin = 40
+    const left = Math.min(...atoms.map((a) => a.x)) - margin
+    const right = Math.max(...atoms.map((a) => a.x)) + margin
+    const top = Math.min(...atoms.map((a) => a.y)) - margin
+    const bottom = Math.max(...atoms.map((a) => a.y)) + margin
+    const aspect = HOME_VIEW.h / HOME_VIEW.w
+    // Never zoom in past 200% just to fill the canvas with a tiny molecule.
+    const w = Math.min(MAX_VIEW_WIDTH, Math.max(right - left, (bottom - top) / aspect, HOME_VIEW.w / 2))
+    const h = w * aspect
+    view = { x: (left + right) / 2 - w / 2, y: (top + bottom) / 2 - h / 2, w, h }
+    applyView()
+  }
+
+  container.querySelector('#zoom-in')!.addEventListener('click', () => zoomAt(1.25, viewCentre()))
+  container.querySelector('#zoom-out')!.addEventListener('click', () => zoomAt(1 / 1.25, viewCentre()))
+  container.querySelector('#zoom-fit')!.addEventListener('click', fitView)
+
+  // Ctrl + wheel (and trackpad pinch, which browsers report the same way) zooms;
+  // a plain wheel still scrolls the page as usual.
+  svg.addEventListener(
+    'wheel',
+    (e) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM()!.inverse())
+      zoomAt(Math.exp(-e.deltaY * 0.002), { x: p.x, y: p.y })
+    },
+    { passive: false },
+  )
 
   const history = new History<Molecule>(options.initial ?? emptyMolecule)
   let tool: Tool = 'draw'
@@ -217,6 +307,13 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
   }
 
   svg.addEventListener('pointerdown', (e) => {
+    // Middle button, or Space + left button, pans instead of editing.
+    if (e.button === 1 || (e.button === 0 && spaceHeld)) {
+      e.preventDefault()
+      drag = { kind: 'pan', clientX: e.clientX, clientY: e.clientY, viewStart: { ...view } }
+      svg.setPointerCapture(e.pointerId)
+      return
+    }
     if (e.button !== 0) return
     const p = toCanvas(e)
     const mol = history.current
@@ -266,6 +363,16 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
   })
 
   svg.addEventListener('pointermove', (e) => {
+    if (drag?.kind === 'pan') {
+      // Screen pixels → drawing units, then move the view the opposite way to the mouse.
+      const unitsPerPixel = drag.viewStart.w / svg.getBoundingClientRect().width
+      view = {
+        ...drag.viewStart,
+        x: drag.viewStart.x - (e.clientX - drag.clientX) * unitsPerPixel,
+        y: drag.viewStart.y - (e.clientY - drag.clientY) * unitsPerPixel,
+      }
+      return applyView()
+    }
     const p = toCanvas(e)
     const mol = history.current
 
@@ -302,6 +409,7 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
     const finished = drag
     drag = null
     preview = undefined
+    if (finished.kind === 'pan') return
 
     if (finished.kind === 'move-atom') {
       if (draft) commit(draft)
@@ -369,6 +477,12 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
     const mol = history.current
 
     if (e.key === 'Escape') return cancelDrag()
+    if (e.key === ' ' && pointerOverCanvas && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault() // stop the page scrolling while panning
+      spaceHeld = true
+      svg.dataset.pan = 'ready'
+      return
+    }
     if (mod && key === 'z' && !e.shiftKey) {
       e.preventDefault()
       return undo()
@@ -391,7 +505,15 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
     }
   })
 
+  document.addEventListener('keyup', (e) => {
+    if (e.key === ' ') {
+      spaceHeld = false
+      delete svg.dataset.pan
+    }
+  })
+
   setTool('draw')
+  applyView()
   redraw()
 
   return {

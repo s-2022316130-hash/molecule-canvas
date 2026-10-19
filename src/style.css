@@ -498,3 +498,57 @@ h2 {
   padding: 0.25rem 0.8rem;
   font-size: 0.85rem;
 }
+
+/* ---------- Phase 8: zoom, pan, shortcuts ---------- */
+
+.zoom-level {
+  min-width: 3.2rem;
+  align-self: center;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.canvas[data-pan='ready'] {
+  cursor: grab;
+}
+
+.canvas[data-pan='ready']:active {
+  cursor: grabbing;
+}
+
+.shortcuts {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.shortcuts summary {
+  cursor: pointer;
+}
+
+.shortcuts dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+}
+
+.shortcuts dt {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shortcuts dd {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .shortcuts dl {
+    grid-template-columns: 1fr;
+  }
+
+  .search-results li {
+    grid-template-columns: 1fr auto;
+  }
+}
