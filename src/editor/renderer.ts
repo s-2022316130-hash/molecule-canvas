@@ -3,9 +3,10 @@
 
 import { getAtom, neighbors, type Atom, type Bond, type Molecule } from '../model/molecule.ts'
 import { implicitHydrogens } from '../model/valence.ts'
-import type { Point } from './geometry.ts'
+import { angleBetween, newBondAngle, pointAt, type Point } from './geometry.ts'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+const WEDGE_HALF_WIDTH = 3.5 // half the width of a wedge at its wide end
 const LABEL_GAP = 9 // how far a bond stops short of a written atom label like "O"
 const MULTI_BOND_OFFSET = 3.5 // spacing between the lines of a double/triple bond
 const HYDROGEN_FIRST = new Set(['O', 'S', 'F', 'Cl', 'Br', 'I'])
@@ -45,6 +46,25 @@ function drawBond(mol: Molecule, bond: Bond, highlighted: boolean): SVGGElement 
   const trimB = showsLabel(mol, b) ? LABEL_GAP : 0
   const start = { x: a.x + ux * trimA, y: a.y + uy * trimA }
   const end = { x: b.x - ux * trimB, y: b.y - uy * trimB }
+
+  if (bond.stereo === 'wedge') {
+    // Solid triangle: a point at the stereocentre (a1), widening towards a2.
+    const corners = [start, { x: end.x + px * WEDGE_HALF_WIDTH, y: end.y + py * WEDGE_HALF_WIDTH }, { x: end.x - px * WEDGE_HALF_WIDTH, y: end.y - py * WEDGE_HALF_WIDTH }]
+    group.append(el('polygon', { points: corners.map((p) => `${p.x},${p.y}`).join(' '), class: 'bond-wedge' }))
+    return group
+  }
+  if (bond.stereo === 'hash') {
+    // Dashes across the bond that get wider towards a2.
+    const visible = Math.hypot(end.x - start.x, end.y - start.y)
+    const count = Math.max(4, Math.round(visible / 5))
+    for (let i = 0; i <= count; i++) {
+      const t = i / count
+      const half = Math.max(0.6, WEDGE_HALF_WIDTH * t)
+      const c = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t }
+      group.append(line({ x: c.x - px * half, y: c.y - py * half }, { x: c.x + px * half, y: c.y + py * half }, 'bond-line hash'))
+    }
+    return group
+  }
 
   const offsets = bond.order === 1 ? [0] : bond.order === 2 ? [-0.5, 0.5] : [-1, 0, 1]
   for (const k of offsets) {
@@ -100,17 +120,51 @@ function drawAtom(mol: Molecule, atom: Atom, highlighted: boolean, problem: bool
   return group
 }
 
-/**
- * Redraws the whole molecule. Simple, and fast enough for hand-drawn molecules.
- * `problems` holds ids of atoms to mark in red (e.g. too many bonds).
- */
-export function render(
-  svg: SVGSVGElement,
-  mol: Molecule,
-  highlight: Highlight = {},
-  preview?: [Point, Point],
-  problems: ReadonlySet<number> = new Set(),
-) {
+/** Stereo descriptors from RDKit, shown as small labels: atom id → "R"/"S"/"?", bond id → "E"/"Z". */
+export interface Annotations {
+  atoms: ReadonlyMap<number, string>
+  bonds: ReadonlyMap<number, string>
+}
+
+export interface View {
+  highlight?: Highlight
+  preview?: [Point, Point]
+  problems?: ReadonlySet<number> // atoms to mark in red (e.g. too many bonds)
+  annotations?: Annotations
+}
+
+function stereoLabel(at: Point, text: string): SVGTextElement {
+  const label = el('text', { x: at.x, y: at.y, class: text === '?' ? 'stereo-label unknown' : 'stereo-label' })
+  label.textContent = `(${text})`
+  return label
+}
+
+function drawAnnotations(mol: Molecule, annotations: Annotations): SVGGElement {
+  const group = el('g', { class: 'annotations' })
+  for (const [atomId, text] of annotations.atoms) {
+    const atom = getAtom(mol, atomId)
+    if (!atom) continue // the drawing changed since RDKit looked at it
+    // Put the label in the widest empty gap around the atom.
+    const direction = newBondAngle(neighbors(mol, atom.id).map((n) => angleBetween(atom, n)))
+    group.append(stereoLabel(pointAt(atom, direction, showsLabel(mol, atom) ? 20 : 15), text))
+  }
+  for (const [bondId, text] of annotations.bonds) {
+    const bond = mol.bonds.find((b) => b.id === bondId)
+    const a = bond && getAtom(mol, bond.a1)
+    const b = bond && getAtom(mol, bond.a2)
+    if (!a || !b) continue
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    // Of the two sides of the bond, use the one with fewer atoms nearby.
+    const sides = [90, -90].map((turn) => pointAt(mid, angleBetween(a, b) + turn, 17))
+    const crowding = (p: Point) => mol.atoms.filter((x) => Math.hypot(x.x - p.x, x.y - p.y) < 30).length
+    group.append(stereoLabel(crowding(sides[0]) <= crowding(sides[1]) ? sides[0] : sides[1], text))
+  }
+  return group
+}
+
+/** Redraws the whole molecule. Simple, and fast enough for hand-drawn molecules. */
+export function render(svg: SVGSVGElement, mol: Molecule, view: View = {}) {
+  const { highlight = {}, preview, problems = new Set(), annotations } = view
   const bonds = el('g', { class: 'bonds' })
   for (const bond of mol.bonds) bonds.append(drawBond(mol, bond, bond.id === highlight.bondId))
 
@@ -118,6 +172,7 @@ export function render(
   for (const atom of mol.atoms) atoms.append(drawAtom(mol, atom, atom.id === highlight.atomId, problems.has(atom.id)))
 
   const overlay = el('g', { class: 'overlay' })
+  if (annotations) overlay.append(drawAnnotations(mol, annotations))
   if (preview) overlay.append(line(preview[0], preview[1], 'preview-line'))
 
   svg.replaceChildren(bonds, atoms, overlay)

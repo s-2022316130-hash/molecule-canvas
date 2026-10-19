@@ -36,8 +36,11 @@ export function toMolBlock(mol: Molecule, title = ''): string {
     lines.push(`${xyz} ${atom.element.padEnd(3)} 0${'  0'.repeat(11)}`)
   }
 
+  // Bond stereo codes in MOL files: 1 = wedge, 6 = hash, measured from the first atom listed.
+  const STEREO_CODE = { wedge: 1, hash: 6 }
   for (const bond of mol.bonds) {
-    lines.push(`${pad(index.get(bond.a1)!, 3)}${pad(index.get(bond.a2)!, 3)}${pad(bond.order, 3)}  0  0  0  0`)
+    const stereo = bond.stereo ? STEREO_CODE[bond.stereo] : 0
+    lines.push(`${pad(index.get(bond.a1)!, 3)}${pad(index.get(bond.a2)!, 3)}${pad(bond.order, 3)}${pad(stereo, 3)}  0  0  0`)
   }
 
   // Charges go in "M  CHG" lines, at most 8 atoms per line.

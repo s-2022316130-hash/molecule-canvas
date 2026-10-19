@@ -357,3 +357,33 @@ h2 {
 .palette-spacer {
   width: 0.75rem;
 }
+
+/* ---------- Phase 5: stereochemistry ---------- */
+
+.bond-wedge {
+  fill: var(--bond);
+  stroke: var(--bond);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+}
+
+.bond.highlighted .bond-wedge {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.bond-line.hash {
+  stroke-width: 1.2;
+}
+
+.stereo-label {
+  font: italic 600 10px system-ui, sans-serif;
+  fill: var(--accent);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.stereo-label.unknown {
+  fill: var(--muted);
+}

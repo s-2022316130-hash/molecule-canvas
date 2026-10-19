@@ -4,31 +4,44 @@
 import {
   addAtom,
   addBond,
+  applyStereo,
   changeCharge,
   cycleBondOrder,
   emptyMolecule,
+  findBond,
   getAtom,
   moveAtom,
   neighbors,
   removeAtom,
   removeBond,
   setElement,
+  type BondStereo,
   type Molecule,
 } from '../model/molecule.ts'
 import { valenceProblems } from '../model/valence.ts'
 import { angleBetween, newBondAngle, pointAt, snapAngle, type Point } from './geometry.ts'
 import { atomAt, bondAt } from './hitTest.ts'
 import { History } from './history.ts'
-import { render, type Highlight } from './renderer.ts'
+import { render, type Annotations, type Highlight } from './renderer.ts'
 import { placeRing, RINGS, type RingTemplate } from './templates.ts'
 
-type Tool = 'draw' | 'ring' | 'charge+' | 'charge-' | 'move' | 'erase'
+type Tool = 'draw' | 'wedge' | 'hash' | 'ring' | 'charge+' | 'charge-' | 'move' | 'erase'
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   {
     id: 'draw',
     label: 'Draw',
     hint: 'Click empty space: add the chosen element. Click an atom: grow a bond (or change it to the chosen element). Drag: draw a bond. Click a bond: single → double → triple.',
+  },
+  {
+    id: 'wedge',
+    label: 'Wedge',
+    hint: 'Bond towards you. Drag from the stereocentre, or click a bond (click again to flip it).',
+  },
+  {
+    id: 'hash',
+    label: 'Hash',
+    hint: 'Bond away from you. Drag from the stereocentre, or click a bond (click again to flip it).',
   },
   { id: 'ring', label: 'Ring', hint: 'Click empty space, an atom, or a bond to place the chosen ring.' },
   { id: 'charge+', label: '+', hint: 'Click an atom to add a positive charge.' },
@@ -63,6 +76,8 @@ export interface EditorApi {
   getMolecule(): Molecule
   /** Replaces the drawing (undoable), e.g. after opening a file. */
   setMolecule(mol: Molecule): void
+  /** Shows R/S and E/Z labels (or hides them when undefined). */
+  setAnnotations(annotations: Annotations | undefined): void
 }
 
 export function mountEditor(container: HTMLElement, options: EditorOptions = {}): EditorApi {
@@ -102,6 +117,7 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
   let highlight: Highlight = {}
   let preview: [Point, Point] | undefined
   let lastReported: Molecule | null = null
+  let annotations: Annotations | undefined // R/S and E/Z labels from RDKit
 
   function makeButton(parent: HTMLElement, label: string, title: string, onClick: () => void) {
     const button = document.createElement('button')
@@ -141,7 +157,7 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
   function redraw() {
     const mol = draft ?? history.current
     const problems = new Set(valenceProblems(mol).map((p) => p.atomId))
-    render(svg, mol, highlight, preview, problems)
+    render(svg, mol, { highlight, preview, problems, annotations })
     undoBtn.disabled = !history.canUndo
     redoBtn.disabled = !history.canRedo
     cleanupBtn.disabled = mol.atoms.length < 2
@@ -177,11 +193,25 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
     return existing ? { point: existing, atomId: existing.id } : { point }
   }
 
-  /** Adds a bond from atom `fromId` to `end`, creating a carbon at the end if needed. */
+  /** The stereo kind the current tool draws, if it's the Wedge or Hash tool. */
+  const stereoTool = (): BondStereo | undefined => (tool === 'wedge' || tool === 'hash' ? tool : undefined)
+
+  /**
+   * Adds a bond from atom `fromId` to `end`, creating a carbon at the end if needed.
+   * With the Wedge/Hash tool the bond becomes a stereo bond, narrow end at `fromId`.
+   */
   function bondTo(mol: Molecule, fromId: number, end: { point: Point; atomId?: number }): Molecule {
-    if (end.atomId !== undefined) return addBond(mol, fromId, end.atomId)
-    const added = addAtom(mol, end.point.x, end.point.y)
-    return addBond(added.mol, fromId, added.id)
+    let result = mol
+    let endId = end.atomId
+    if (endId === undefined) {
+      const added = addAtom(result, end.point.x, end.point.y)
+      result = added.mol
+      endId = added.id
+    }
+    const stereo = stereoTool()
+    if (!stereo) return addBond(result, fromId, endId)
+    if (!findBond(result, fromId, endId)) result = addBond(result, fromId, endId)
+    return applyStereo(result, findBond(result, fromId, endId)!.id, stereo, fromId)
   }
 
   svg.addEventListener('pointerdown', (e) => {
@@ -212,6 +242,17 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
       case 'move':
         if (!atom) return
         drag = { kind: 'move-atom', atomId: atom.id, start: p, moved: false }
+        break
+      case 'wedge':
+      case 'hash':
+        if (atom) drag = { kind: 'bond-from-atom', atomId: atom.id, start: p, moved: false }
+        else if (bond) {
+          // Clicking a bond wedges it, narrow end at whichever atom the click was nearer.
+          const a1 = getAtom(mol, bond.a1)!
+          const a2 = getAtom(mol, bond.a2)!
+          const nearer = Math.hypot(p.x - a1.x, p.y - a1.y) <= Math.hypot(p.x - a2.x, p.y - a2.y) ? a1 : a2
+          return commit(applyStereo(mol, bond.id, tool, nearer.id))
+        } else drag = { kind: 'bond-from-empty', start: p, moved: false }
         break
       case 'draw':
         if (atom) drag = { kind: 'bond-from-atom', atomId: atom.id, start: p, moved: false }
@@ -269,7 +310,7 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
       const from = getAtom(mol, finished.atomId)!
       if (finished.moved) {
         commit(bondTo(mol, from.id, bondEnd(mol, from, p, from.id)))
-      } else if (from.element !== element) {
+      } else if (tool === 'draw' && from.element !== element) {
         commit(setElement(mol, from.id, element)) // clicking with N chosen turns the atom into N
       } else {
         // A simple click on an atom grows a new bond in a sensible direction.
@@ -282,7 +323,7 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
     }
 
     // Started on empty canvas: a click adds one atom, a drag adds a whole bond.
-    const first = addAtom(mol, finished.start.x, finished.start.y, element)
+    const first = addAtom(mol, finished.start.x, finished.start.y, tool === 'draw' ? element : 'C')
     commit(finished.moved ? bondTo(first.mol, first.id, bondEnd(mol, finished.start, p)) : first.mol)
   })
 
@@ -356,6 +397,10 @@ export function mountEditor(container: HTMLElement, options: EditorOptions = {})
     setMolecule: (mol) => {
       highlight = {}
       commit(mol)
+    },
+    setAnnotations: (next) => {
+      annotations = next
+      redraw()
     },
   }
 }

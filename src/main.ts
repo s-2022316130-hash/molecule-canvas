@@ -2,7 +2,7 @@ import './style.css'
 import type { MainModule } from '@rdkit/rdkit'
 import { cleanUpLayout } from './chem/layout.ts'
 import { loadRDKit } from './chem/rdkit.ts'
-import { mountEditor } from './editor/editor.ts'
+import { mountEditor, type EditorApi } from './editor/editor.ts'
 import { mountPropertiesPanel } from './ui/propertiesPanel.ts'
 import { mountSmilesViewer } from './ui/smilesViewer.ts'
 
@@ -33,8 +33,13 @@ app.innerHTML = `
 let rdkit: MainModule | null = null
 loadRDKit().then((module) => (rdkit = module))
 
-const updateProperties = mountPropertiesPanel(document.querySelector<HTMLDivElement>('#properties')!)
-mountEditor(document.querySelector<HTMLDivElement>('#editor')!, {
+let editor: EditorApi | null = null
+
+// Each RDKit analysis also feeds the R/S and E/Z labels drawn on the canvas.
+const updateProperties = mountPropertiesPanel(document.querySelector<HTMLDivElement>('#properties')!, (analysis) =>
+  editor?.setAnnotations(analysis ? { atoms: analysis.atomStereo, bonds: analysis.bondStereo } : undefined),
+)
+editor = mountEditor(document.querySelector<HTMLDivElement>('#editor')!, {
   onChange: updateProperties,
   cleanUp: (mol) => (rdkit ? cleanUpLayout(rdkit, mol) : null),
 })

@@ -2,7 +2,7 @@
 // It shows the formula and masses of whatever is drawn, updating after every edit.
 
 import type { MainModule } from '@rdkit/rdkit'
-import { analyze } from '../chem/analyze.ts'
+import { analyze, type Analysis } from '../chem/analyze.ts'
 import { loadRDKit } from '../chem/rdkit.ts'
 import type { Molecule } from '../model/molecule.ts'
 import { valenceProblems } from '../model/valence.ts'
@@ -10,8 +10,14 @@ import { renderFormula } from './formulaView.ts'
 
 const ELEMENT_NAMES: Record<string, string> = { C: 'carbon', N: 'nitrogen', O: 'oxygen', S: 'sulfur', P: 'phosphorus' }
 
-/** Builds the panel and returns the function to call whenever the molecule changes. */
-export function mountPropertiesPanel(container: HTMLElement): (mol: Molecule) => void {
+/**
+ * Builds the panel and returns the function to call whenever the molecule changes.
+ * `onAnalysis` receives each RDKit result (or null when there is none), e.g. to show R/S labels.
+ */
+export function mountPropertiesPanel(
+  container: HTMLElement,
+  onAnalysis?: (analysis: Analysis | null) => void,
+): (mol: Molecule) => void {
   // Fixed skeleton text only; all values are inserted with textContent.
   container.innerHTML = `
     <p class="props-message" id="props-message">Loading chemistry engine…</p>
@@ -33,6 +39,7 @@ export function mountPropertiesPanel(container: HTMLElement): (mol: Molecule) =>
   let latest: Molecule | null = null
 
   function showMessage(text: string, isError = false) {
+    onAnalysis?.(null)
     props.hidden = true
     message.hidden = false
     message.textContent = text
@@ -61,6 +68,7 @@ export function mountPropertiesPanel(container: HTMLElement): (mol: Molecule) =>
     smilesEl.textContent = result.smiles
     message.hidden = true
     props.hidden = false
+    onAnalysis?.(result)
   }
 
   loadRDKit().then(

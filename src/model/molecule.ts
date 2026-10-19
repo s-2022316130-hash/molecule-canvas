@@ -14,11 +14,19 @@ export interface Atom {
   readonly charge: number
 }
 
+/**
+ * Stereo bonds show 3D direction in a 2D drawing:
+ * 'wedge' (solid triangle) comes towards you, 'hash' (dashes) goes away.
+ * The narrow end is always at a1, which should be the stereocentre.
+ */
+export type BondStereo = 'wedge' | 'hash'
+
 export interface Bond {
   readonly id: number
   readonly a1: number // id of the first atom
   readonly a2: number // id of the second atom
   readonly order: BondOrder
+  readonly stereo?: BondStereo
 }
 
 export interface Molecule {
@@ -66,7 +74,26 @@ export function cycleBondOrder(mol: Molecule, bondId: number): Molecule {
   const next: Record<BondOrder, BondOrder> = { 1: 2, 2: 3, 3: 1 }
   return {
     ...mol,
-    bonds: mol.bonds.map((b) => (b.id === bondId ? { ...b, order: next[b.order] } : b)),
+    // Only single bonds can be wedged, so changing the order drops any wedge/hash.
+    bonds: mol.bonds.map((b) => (b.id === bondId ? { id: b.id, a1: b.a1, a2: b.a2, order: next[b.order] } : b)),
+  }
+}
+
+/**
+ * Applies a wedge or hash to a bond, ChemDraw-style:
+ *   • a plain bond (or the other stereo kind) becomes `kind`, narrow end at `narrowEnd`
+ *   • a bond that already has `kind` is flipped (the narrow end swaps sides)
+ * The bond also becomes single, since only single bonds can be stereo bonds.
+ */
+export function applyStereo(mol: Molecule, bondId: number, kind: BondStereo, narrowEnd?: number): Molecule {
+  return {
+    ...mol,
+    bonds: mol.bonds.map((b) => {
+      if (b.id !== bondId) return b
+      if (b.stereo === kind) return { ...b, a1: b.a2, a2: b.a1 }
+      const start = narrowEnd === b.a2 ? b.a2 : b.a1
+      return { id: b.id, a1: start, a2: start === b.a1 ? b.a2 : b.a1, order: 1, stereo: kind }
+    }),
   }
 }
 
