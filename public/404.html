@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molecule Canvas</title>
+    <!--
+      GitHub Pages shows this page for any address inside the site that doesn't exist
+      (a typo, an old bookmark). Instead of a dead end, send the visitor to the editor.
+      The site lives in a folder named after the repository (/molecule-canvas/),
+      so the editor's address is the first folder of the current path.
+    -->
+    <script>
+      var first = window.location.pathname.split('/')[1]
+      window.location.replace(first ? '/' + first + '/' : '/')
+    </script>
+    <style>
+      body {
+        margin: 0;
+        padding: 3rem 1rem;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+        color: #1d2330;
+        background: #ffffff;
+      }
+      a {
+        color: #1f7a5a;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Molecule Canvas</h1>
+    <p>That page doesn't exist. Taking you to the editor…</p>
+    <p><a href="/molecule-canvas/">Open Molecule Canvas</a></p>
+  </body>
+</html>
