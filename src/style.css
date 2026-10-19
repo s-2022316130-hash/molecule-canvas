@@ -428,3 +428,73 @@ h2 {
 .file-status.error {
   color: var(--error);
 }
+
+/* ---------- Phase 7: name / formula search ---------- */
+
+.search-form {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.search-form input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.search-form button,
+.search-results button {
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.search-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.search-status {
+  margin: 0.5rem 0 0;
+  min-height: 1.2em;
+  color: var(--accent);
+}
+
+.search-status.error {
+  color: var(--error);
+}
+
+.search-results {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-results li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-name {
+  overflow-wrap: anywhere;
+}
+
+.result-mw {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.search-results button {
+  padding: 0.25rem 0.8rem;
+  font-size: 0.85rem;
+}

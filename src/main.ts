@@ -9,10 +9,11 @@ import { fromMolBlock, toMolBlock } from './model/molfile.ts'
 import type { Molecule } from './model/molecule.ts'
 import { CANVAS_CENTRE, mountFileBar } from './ui/fileBar.ts'
 import { mountPropertiesPanel } from './ui/propertiesPanel.ts'
+import { mountSearchPanel } from './ui/searchPanel.ts'
 import { mountSmilesViewer } from './ui/smilesViewer.ts'
 
 // Entry point: Vite loads this file from index.html.
-// The page has two parts: the drawing editor and the SMILES viewer.
+// The page has three parts: the drawing editor, name/formula search, and the SMILES viewer.
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
@@ -26,6 +27,10 @@ app.innerHTML = `
       <div id="file-bar"></div>
       <div id="editor"></div>
       <div id="properties" class="properties" aria-live="polite"></div>
+    </section>
+    <section aria-labelledby="search-heading">
+      <h2 id="search-heading">Find by name or formula</h2>
+      <div id="search"></div>
     </section>
     <section aria-labelledby="smiles-heading">
       <h2 id="smiles-heading">SMILES viewer</h2>
@@ -85,11 +90,16 @@ mountFileBar(document.querySelector<HTMLDivElement>('#file-bar')!, {
   getAnnotations: stereoLabels,
 })
 
-rdkit = await loadRDKit()
-await mountSmilesViewer(document.querySelector<HTMLDivElement>('#smiles-viewer')!, (smiles) => {
+/** Puts a SMILES string on the canvas (replacing the drawing, undoable). False if it can't yet. */
+function drawSmiles(smiles: string): boolean {
   const mol = rdkit && importStructure(rdkit, smiles, CANVAS_CENTRE)
-  if (mol) {
-    editor?.setMolecule(mol)
-    document.querySelector('#draw-heading')?.scrollIntoView({ behavior: 'smooth' })
-  }
-})
+  if (!mol) return false
+  editor?.setMolecule(mol)
+  document.querySelector('#draw-heading')?.scrollIntoView({ behavior: 'smooth' })
+  return true
+}
+
+mountSearchPanel(document.querySelector<HTMLDivElement>('#search')!, (candidate) => drawSmiles(candidate.smiles))
+
+rdkit = await loadRDKit()
+await mountSmilesViewer(document.querySelector<HTMLDivElement>('#smiles-viewer')!, drawSmiles)
