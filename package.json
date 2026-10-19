@@ -2,6 +2,8 @@
   "name": "molecule-canvas",
   "private": true,
   "version": "0.0.0",
+  "description": "A browser-based chemical structure editor",
+  "homepage": "https://s-2022316130-hash.github.io/molecule-canvas/",
   "type": "module",
   "scripts": {
     "dev": "vite",
